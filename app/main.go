@@ -61,7 +61,6 @@ func initCmd() error {
 	}
 
 	headFileContents := []byte("ref: refs/heads/master\n")
-	// ioutil package is deprecated
 	if err := os.WriteFile(".git/HEAD", headFileContents, 0644); err != nil {
 		return fmt.Errorf("write %s: %w", ".git/HEAD", err)
 	}
@@ -123,7 +122,7 @@ func prettyPrintObject(bufr *bufio.Reader) error {
 	}
 
 	if typ != "blob" {
-		return fmt.Errorf("unsupported object type")
+		return fmt.Errorf("unsupported object type: %v", typ)
 	}
 
 	_, err = io.CopyN(os.Stdout, bufr, size)
@@ -142,16 +141,16 @@ func parseObjectHeader(br *bufio.Reader) (string, int64, error) {
 
 	typ = typ[:len(typ)-1] // cut ' '
 
-	siz, err := br.ReadString('\000')
+	sizeStr, err := br.ReadString('\000')
 	if err != nil {
 		return "", 0, fmt.Errorf("read size: %w", err)
 	}
 
-	siz = siz[:len(siz)-1] // cut '\000'
+	sizeStr = sizeStr[:len(sizeStr)-1] // cut '\000'
 
-	size, err := strconv.ParseInt(siz, 10, 64)
+	size, err := strconv.ParseInt(sizeStr, 10, 64)
 	if err != nil {
-		return "", 0, fmt.Errorf("parse size: %w", err)
+		return "", 0, fmt.Errorf("parse size: %w", err) // ParseInt already includes the sizeStr in error
 	}
 
 	return typ, size, nil
