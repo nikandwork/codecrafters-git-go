@@ -2,35 +2,56 @@ package main
 
 import (
 	"fmt"
-	// Uncomment this block to pass the first stage!
-	//  "io/ioutil"
-	//  "os"
+	"os"
 )
 
-// Usage: your_git.sh run <image> <command> <arg1> <arg2> ...
 func main() {
-	// You can use print statements as follows for debugging, they'll be visible when running tests.
-	fmt.Println("Logs from your program will appear here!")
+	if len(os.Args) == 1 {
+		help()
+		os.Exit(1)
+	}
 
-	// Uncomment this block to pass the first stage!
-	//
-	// switch command := os.Args[1]; command {
-	// case "init":
-	//     for _, dir := range []string{".git", ".git/objects", ".git/refs"} {
-	//         if err := os.Mkdir(dir, 0755); err != nil {
-	//             fmt.Printf("Error creating directory: %s\n", err)
-	//         }
-	//     }
-	//
-	//     headFileContents := []byte("ref: refs/heads/master\n")
-	//     if err := ioutil.WriteFile(".git/HEAD", headFileContents, 0644); err != nil {
-	// 	       fmt.Printf("Error writing file: %s\n", err)
-	// 	   }
-	//
-	//     fmt.Println("Initialized git directory")
-	//
-	// default:
-	//     fmt.Println("Unknown command %s", command)
-	//     os.Exit(1)
-	// }
+	var err error
+
+	switch command := os.Args[1]; command {
+	case "init":
+		err = initCmd()
+	default:
+		err = fmt.Errorf("%q is not a git command. See git --help", command)
+	}
+
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "git: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func help() {
+	fmt.Printf(`usage: git [<flags>] <command> [<args>]
+
+There are commands:
+
+start a working area
+`)
+
+	fmt.Printf("   init     Create an empty Git repository\n")
+}
+
+func initCmd() error {
+	for _, dir := range []string{".git", ".git/objects", ".git/refs"} {
+		err := os.MkdirAll(dir, 0755)
+		if err != nil {
+			return err // os package wraps error for us, so we shouldn't
+		}
+	}
+
+	headFileContents := []byte("ref: refs/heads/master\n")
+	// ioutil package is deprecated
+	if err := os.WriteFile(".git/HEAD", headFileContents, 0644); err != nil {
+		return fmt.Errorf("write %s: %w", ".git/HEAD", err)
+	}
+
+	fmt.Println("Initialized git directory")
+
+	return nil
 }
