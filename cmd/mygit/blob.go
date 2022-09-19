@@ -125,7 +125,7 @@ func hashObjectCmd(args []string) error {
 			return fmt.Errorf("%v: %w", file, err)
 		}
 
-		fmt.Printf("%s\n", sum)
+		fmt.Printf("%x\n", sum)
 	}
 
 	return nil
