@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -154,13 +153,7 @@ func hashObject(typ, file string, doWrite bool) (err error) {
 	fname := filepath.Join(".git", "objects", sumStr[:2], sumStr[2:])
 	dir := filepath.Dir(fname)
 
-	log.Printf("fname %q in dir %q", fname, dir)
-
-	abs, err := filepath.Abs(dir)
-	log.Printf("abs path: %v %v", abs, err)
-
 	err = os.MkdirAll(dir, 0755)
-	log.Printf("mkdir: %v", err)
 	if err != nil {
 		return fmt.Errorf("create dir: %w", err)
 	}
