@@ -13,7 +13,7 @@ import (
 )
 
 func catFileCmd(args []string) (err error) {
-	if len(args) < 3 || args[1] != "-p" {
+	if len(args) != 3 || args[1] != "-p" {
 		fmt.Printf("usage: git cat-file -p <object>\n\n")
 		fmt.Printf("    -p			pretty print object's content\n")
 
