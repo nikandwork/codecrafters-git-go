@@ -1,14 +1,9 @@
 package main
 
 import (
-	"bufio"
-	"compress/zlib"
 	"errors"
 	"fmt"
-	"io"
 	"os"
-	"path/filepath"
-	"strconv"
 )
 
 var ErrUsage = errors.New("usage error")
@@ -20,21 +15,24 @@ func main() {
 	}
 
 	var err error
+	command := os.Args[1]
 
-	switch command := os.Args[1]; command {
+	switch command {
 	case "help":
 		help()
 	case "init":
 		err = initCmd()
 	case "cat-file":
-		err = catfileCmd(os.Args[1:])
+		err = catFileCmd(os.Args[1:])
+	case "hash-object":
+		err = hashObjectCmd(os.Args[1:])
 	default:
 		err = fmt.Errorf("%q is not a git command. See git --help", command)
 	}
 
 	if err != nil {
 		if !errors.Is(err, ErrUsage) {
-			fmt.Fprintf(os.Stderr, "git: %v\n", err)
+			fmt.Fprintf(os.Stderr, "git: %v: %v\n", command, err)
 		}
 
 		os.Exit(1)
@@ -68,90 +66,4 @@ func initCmd() error {
 	fmt.Println("Initialized git directory")
 
 	return nil
-}
-
-func catfileCmd(args []string) (err error) {
-	if len(args) < 3 || args[1] != "-p" {
-		fmt.Printf("usage: git cat-file -p <object>\n\n")
-		fmt.Printf("    -p			pretty print object's content\n")
-
-		return ErrUsage
-	}
-
-	obj := args[2]
-
-	if len(obj) != 40 {
-		return fmt.Errorf("bad object hash")
-	}
-
-	fname := filepath.Join(".git", "objects", obj[:2], obj[2:])
-
-	f, err := os.Open(fname)
-	if err != nil {
-		return err // os package wraps error for us
-	}
-
-	defer func() {
-		e := f.Close()
-		if err == nil && e != nil {
-			err = fmt.Errorf("close file: %w", e)
-		}
-	}()
-
-	zr, err := zlib.NewReader(f)
-	if err != nil {
-		return fmt.Errorf("new zlib reader: %w", err)
-	}
-
-	defer func() {
-		e := zr.Close()
-		if err == nil && e != nil {
-			err = fmt.Errorf("close zlib reader: %w", e)
-		}
-	}()
-
-	bufr := bufio.NewReader(zr)
-
-	return prettyPrintObject(bufr)
-}
-
-func prettyPrintObject(bufr *bufio.Reader) error {
-	typ, size, err := parseObjectHeader(bufr)
-	if err != nil {
-		return fmt.Errorf("parse object header: %w", err)
-	}
-
-	if typ != "blob" {
-		return fmt.Errorf("unsupported object type: %v", typ)
-	}
-
-	_, err = io.CopyN(os.Stdout, bufr, size)
-	if err != nil {
-		return fmt.Errorf("read content: %w", err)
-	}
-
-	return nil
-}
-
-func parseObjectHeader(br *bufio.Reader) (string, int64, error) {
-	typ, err := br.ReadString(' ')
-	if err != nil {
-		return "", 0, fmt.Errorf("read type: %w", err)
-	}
-
-	typ = typ[:len(typ)-1] // cut ' '
-
-	sizeStr, err := br.ReadString('\000')
-	if err != nil {
-		return "", 0, fmt.Errorf("read size: %w", err)
-	}
-
-	sizeStr = sizeStr[:len(sizeStr)-1] // cut '\000'
-
-	size, err := strconv.ParseInt(sizeStr, 10, 64)
-	if err != nil {
-		return "", 0, fmt.Errorf("parse size: %w", err) // ParseInt already includes the sizeStr in error
-	}
-
-	return typ, size, nil
 }
