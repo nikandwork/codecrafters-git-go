@@ -54,13 +54,17 @@ func catFileCmd(args []string) (err error) {
 
 	bufr := bufio.NewReader(zr)
 
-	return prettyPrintObject(bufr)
+	return prettyPrintObject(bufr, false)
 }
 
-func prettyPrintObject(bufr *bufio.Reader) error {
+func prettyPrintObject(bufr *bufio.Reader, nameOnly bool) error {
 	typ, size, err := parseObjectHeader(bufr)
 	if err != nil {
 		return fmt.Errorf("parse object header: %w", err)
+	}
+
+	if typ == "tree" {
+		return lsTreeObject(bufr, nameOnly)
 	}
 
 	if typ != "blob" {
@@ -116,21 +120,27 @@ func hashObjectCmd(args []string) error {
 	}
 
 	for _, file := range args {
-		err := hashObject("blob", file, doWrite)
+		sum, err := hashObjectFile("blob", file, doWrite)
 		if err != nil {
 			return fmt.Errorf("%v: %w", file, err)
 		}
+
+		fmt.Printf("%s\n", sum)
 	}
 
 	return nil
 }
 
-func hashObject(typ, file string, doWrite bool) (err error) {
+func hashObjectFile(typ, file string, doWrite bool) (Hash, error) {
 	data, err := os.ReadFile(file)
 	if err != nil {
-		return fmt.Errorf("read file: %w", err)
+		return Hash{}, fmt.Errorf("read file: %w", err)
 	}
 
+	return hashObject(typ, data, doWrite)
+}
+
+func hashObject(typ string, data []byte, doWrite bool) (sum Hash, err error) {
 	object := make([]byte, 0, len(typ)+1+21+len(data)) // typ + ' ' + <size> + '\000' + data
 
 	object = append(object, typ...)
@@ -141,26 +151,25 @@ func hashObject(typ, file string, doWrite bool) (err error) {
 
 	object = append(object, data...)
 
-	sum := sha1.Sum(object)
-	sumStr := hex.EncodeToString(sum[:])
+	sum = sha1.Sum(object)
 
 	if !doWrite {
-		fmt.Printf("%s\n", sumStr)
-
-		return nil
+		return sum, nil
 	}
+
+	sumStr := hex.EncodeToString(sum[:])
 
 	fname := filepath.Join(".git", "objects", sumStr[:2], sumStr[2:])
 	dir := filepath.Dir(fname)
 
 	err = os.MkdirAll(dir, 0755)
 	if err != nil {
-		return fmt.Errorf("create dir: %w", err)
+		return sum, fmt.Errorf("create dir: %w", err)
 	}
 
 	f, err := os.Create(fname)
 	if err != nil {
-		return fmt.Errorf("create file: %w", err)
+		return sum, fmt.Errorf("create file: %w", err)
 	}
 
 	defer func() {
@@ -174,15 +183,13 @@ func hashObject(typ, file string, doWrite bool) (err error) {
 
 	_, err = w.Write(object)
 	if err != nil {
-		return fmt.Errorf("write file: %w", err)
+		return sum, fmt.Errorf("write file: %w", err)
 	}
 
 	err = w.Close()
 	if err != nil {
-		return fmt.Errorf("close zlib writer: %w", err)
+		return sum, fmt.Errorf("close zlib writer: %w", err)
 	}
 
-	fmt.Printf("%s\n", sumStr)
-
-	return nil
+	return sum, nil
 }
