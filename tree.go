@@ -53,7 +53,7 @@ func (g *Git) lsTree(content []byte, nameOnly bool) error {
 		sum := content[zero+1 : zero+1+20]
 
 		if nameOnly {
-			fmt.Printf("%v\n", name)
+			fmt.Printf("%s\n", name)
 		} else {
 			modeInt, err := parseMode(string(mode))
 			if err != nil {
