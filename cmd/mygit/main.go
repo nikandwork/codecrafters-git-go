@@ -1,9 +1,14 @@
 package main
 
 import (
+	"bytes"
+	"compress/zlib"
 	"errors"
 	"fmt"
+	"io"
 	"os"
+
+	git "git.codecrafters.io/0c40c1d7ba1ab4a0"
 )
 
 var ErrUsage = errors.New("usage error")
@@ -14,33 +19,56 @@ func main() {
 		os.Exit(1)
 	}
 
+	err := run(os.Args)
+	if err != nil {
+		if !errors.Is(err, ErrUsage) {
+			fmt.Fprintf(os.Stderr, "git: %v\n", err)
+		}
+
+		os.Exit(1)
+	}
+}
+
+func run(args []string) error {
 	var err error
-	command := os.Args[1]
+	command := args[1]
 
 	switch command {
 	case "help":
 		help()
+
+		return nil
 	case "init":
-		err = initCmd()
+		_, err = git.Init(".")
+
+		return err
+	}
+
+	g, err := git.Find(".")
+	if err != nil {
+		return err
+	}
+
+	switch command {
 	case "cat-file":
-		err = catFileCmd(os.Args[1:])
+		err = catFileCmd(g, os.Args[1:])
 	case "hash-object":
-		err = hashObjectCmd(os.Args[1:])
+		err = hashObjectCmd(g, os.Args[1:])
 	case "ls-tree":
-		err = lsTreeCmd(os.Args[1:])
+		err = lsTreeCmd(g, os.Args[1:])
 	case "write-tree":
-		err = writeTreeCmd(os.Args[1:])
+		err = writeTreeCmd(g, os.Args[1:])
+	case "zlib":
+		err = zlibCmd(os.Args[1:])
 	default:
 		err = fmt.Errorf("%q is not a git command. See git --help", command)
 	}
 
 	if err != nil {
-		if !errors.Is(err, ErrUsage) {
-			fmt.Fprintf(os.Stderr, "git: %v: %v\n", command, err)
-		}
-
-		os.Exit(1)
+		return fmt.Errorf("%v: %w", command, err)
 	}
+
+	return nil
 }
 
 func help() {
@@ -68,6 +96,65 @@ func initCmd() error {
 	}
 
 	fmt.Println("Initialized git directory")
+
+	return nil
+}
+
+func zlibCmd(args []string) (err error) {
+	if len(args) < 2 {
+		fmt.Fprintf(os.Stderr, "usage: git zlib -d [<file>]\n\nread from stdin if file not specified\n")
+
+		return ErrUsage
+	}
+
+	switch f := args[1]; f {
+	case "-d":
+		// fine
+	default:
+		return fmt.Errorf("unsupported flag: %v", f)
+	}
+
+	obj := "-"
+
+	if len(args) > 2 {
+		obj = args[2]
+	}
+
+	var data []byte
+
+	if obj == "-" {
+		data, err = io.ReadAll(os.Stdin)
+		if err != nil {
+			return fmt.Errorf("read stdin: %w", err)
+		}
+	} else {
+		data, err = os.ReadFile(obj)
+		if err != nil {
+			return fmt.Errorf("read file: %w", err)
+		}
+	}
+
+	r, err := zlib.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return fmt.Errorf("new zlib reader: %w", err)
+	}
+
+	defer func() {
+		e := r.Close()
+		if err == nil && e != nil {
+			err = fmt.Errorf("close zlib reader: %w", e)
+		}
+	}()
+
+	decoded, err := io.ReadAll(r)
+	if err != nil {
+		return fmt.Errorf("decode: %w", err)
+	}
+
+	_, err = os.Stdout.Write(decoded)
+	if err != nil {
+		return fmt.Errorf("write to output: %w", err)
+	}
 
 	return nil
 }
