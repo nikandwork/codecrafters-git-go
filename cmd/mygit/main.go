@@ -42,6 +42,11 @@ func run(args []string) error {
 		_, err = git.Init(".")
 
 		return err
+
+	case "zlib":
+		err = zlibCmd(os.Args[1:])
+
+		return err
 	}
 
 	g, err := git.Find(".")
@@ -58,8 +63,8 @@ func run(args []string) error {
 		err = lsTreeCmd(g, os.Args[1:])
 	case "write-tree":
 		err = writeTreeCmd(g, os.Args[1:])
-	case "zlib":
-		err = zlibCmd(os.Args[1:])
+	case "commit-tree":
+		err = commitTreeCmd(g, os.Args[1:])
 	default:
 		err = fmt.Errorf("%q is not a git command. See git --help", command)
 	}

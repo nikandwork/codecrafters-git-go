@@ -126,10 +126,10 @@ func (g *Git) WriteTree(dir string, write bool) (object.Hash, error) {
 		table = fmt.Appendf(table, "%06o %v\x00%s", gitMode, f.Name(), sum[:])
 	}
 
-	return g.hashTree("tree", table, write)
+	return g.hashObject("tree", table, write)
 }
 
-func (g *Git) hashTree(typ string, content []byte, write bool) (object.Hash, error) {
+func (g *Git) hashObject(typ string, content []byte, write bool) (object.Hash, error) {
 	var buf bytes.Buffer
 
 	key, err := object.Write(&buf, typ, content)
@@ -141,17 +141,9 @@ func (g *Git) hashTree(typ string, content []byte, write bool) (object.Hash, err
 		return key, nil
 	}
 
-	objPath := g.objectPath(key)
-	dir := filepath.Dir(objPath)
-
-	err = os.MkdirAll(dir, 0755)
+	err = g.writeToStorage(key, buf.Bytes())
 	if err != nil {
-		return object.Hash{}, fmt.Errorf("create object dir: %w", err)
-	}
-
-	err = os.WriteFile(objPath, buf.Bytes(), 0644)
-	if err != nil {
-		return object.Hash{}, fmt.Errorf("write file: %w", err)
+		return object.Hash{}, fmt.Errorf("write to storage: %w", err)
 	}
 
 	return key, nil

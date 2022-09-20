@@ -25,7 +25,7 @@ func (g *Git) CatFile(obj string) error {
 	}
 
 	switch typ {
-	case "blob":
+	case "blob", "commit":
 		_, err = os.Stdout.Write(content)
 	case "tree":
 		err = g.lsTree(content, false)
@@ -56,20 +56,29 @@ func (g *Git) writeObject(typ, file string, write bool) (object.Hash, error) {
 		return key, nil
 	}
 
-	path := g.objectPath(key)
-	dir := filepath.Dir(path)
-
-	err = os.MkdirAll(dir, 0755)
+	err = g.writeToStorage(key, buf.Bytes())
 	if err != nil {
-		return object.Hash{}, fmt.Errorf("create object dir: %w", err)
-	}
-
-	err = os.WriteFile(path, buf.Bytes(), 0644)
-	if err != nil {
-		return object.Hash{}, fmt.Errorf("write file: %w", err)
+		return object.Hash{}, fmt.Errorf("write to storage: %w", err)
 	}
 
 	return key, nil
+}
+
+func (g *Git) writeToStorage(key object.Hash, content []byte) error {
+	path := g.objectPath(key)
+	dir := filepath.Dir(path)
+
+	err := os.MkdirAll(dir, 0755)
+	if err != nil {
+		return fmt.Errorf("create object dir: %w", err)
+	}
+
+	err = os.WriteFile(path, content, 0644)
+	if err != nil {
+		return fmt.Errorf("write file: %w", err)
+	}
+
+	return nil
 }
 
 func (g *Git) findPath(obj string) (string, error) {

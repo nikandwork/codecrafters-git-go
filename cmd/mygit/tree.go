@@ -28,12 +28,12 @@ func lsTreeCmd(g *git.Git, args []string) (err error) {
 }
 
 func writeTreeCmd(g *git.Git, args []string) error {
-	sum, err := g.WriteTree(".", true)
+	key, err := g.WriteTree(".", true)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("%x\n", sum[:])
+	fmt.Printf("%x\n", key[:])
 
 	return nil
 }
